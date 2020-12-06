@@ -52,7 +52,7 @@ impl Cpu {
     }
 
     fn load_rom(&mut self) {
-        let mut f = File::open("data/brix").expect("file not found");
+        let mut f = File::open("data/test.ch8").expect("file not found");
         //let mut f = File::open(args().last().unwrap()).expect("file not found");
         let mut buffer = Vec::new();
         f.read_to_end(&mut buffer).unwrap();
@@ -78,39 +78,39 @@ impl Cpu {
             0x6000 => self.op_6xxx(),
             0x7000 => self.op_7xxx(),
             0x8000 => self.op_8xxx(),
+            0x9000 => self.op_9xxx(),
             0xA000 => self.op_axxx(),
+            0xB000 => self.op_bxxx(),
             0xC000 => self.op_cxxx(),
             0xD000 => self.op_dxxx(),
+            0xE000 => self.op_exxx(),
             0xF000 => self.op_fxxx(),
-            _ => print!("None"),
+            _ => print!("None {}\n",self.opcode),
         }
     }
 
     fn op_0xxx(&mut self) {
-        match self.opcode{
-            0x00E0 => {
-                self.pc += 2;
-                print!("Clear");
+        match self.opcode & 0x000F{
+            0x0000 => {
+                //self.pc += 2;
             }
-            0xEE => {
-                self.sp += 1;
+            0x000E => {
                 self.pc = self.stack[self.sp];
-                print!("Return");
+                self.sp -= 1;
             }
-            _ => print!("None2"),
+            _ => print!("2 None {}\n", self.opcode),
         }
+        self.pc += 2;
     }
 
     fn op_1xxx(&mut self) {
         self.pc = self.nnn();
-        print!("Jump");
     }
 
     fn op_2xxx(&mut self) {
         self.sp += 1;
         self.stack[self.sp] = self.pc;
         self.pc = self.nnn();
-        print!("2");
     }
 
     fn op_3xxx(&mut self) {
@@ -119,7 +119,6 @@ impl Cpu {
         } else {
             self.pc += 2;
         }
-        print!("3");
     }
 
     fn op_4xxx(&mut self) {
@@ -128,7 +127,6 @@ impl Cpu {
         } else {
             self.pc += 2;
         }
-        print!("4");
     }
 
     fn op_5xxx(&mut self) {
@@ -137,19 +135,16 @@ impl Cpu {
         } else {
             self.pc += 2;
         }
-        print!("5");
     }
 
     fn op_6xxx(&mut self) {
         self.v_registers[self.x()] = self.kk();
         self.pc += 2;
-        print!("6");
     }
 
     fn op_7xxx(&mut self) {
         self.v_registers[self.x()] += self.kk();
         self.pc += 2;
-        print!("7");
     }
 
     fn op_8xxx(&mut self) {
@@ -158,49 +153,86 @@ impl Cpu {
                 self.v_registers[self.x()] = self.v_registers[self.y()];
                 self.pc += 2;
             },
+            1 => {
+                self.v_registers[self.x()] = self.v_registers[self.x()] | self.v_registers[self.y()];
+                self.pc += 2;
+            },
+            2 => {
+                self.v_registers[self.x()] = self.v_registers[self.x()] & self.v_registers[self.y()];
+                self.pc += 2;
+            },
+            3 => {
+                self.v_registers[self.x()] = self.v_registers[self.x()] ^ self.v_registers[self.y()];
+                self.pc += 2;
+            },
+            4 => {
+                self.v_registers[self.x()] += self.v_registers[self.y()];
+                self.v_registers[15] = if self.v_registers[self.x()] as u8 > 0xFF as u8 {1} else {0};
+                self.pc += 2;
+            },
+            5 => {
+
+                self.pc += 2;
+            },
+            6 => {
+                
+                self.pc += 2;
+            },
+            7 => {
+                
+                self.pc += 2;
+            },
+            0xE => {
+                self.v_registers[15] = self.v_registers[self.x()] >> 7;
+                self.v_registers[self.x()] <<= 1;
+                self.pc += 2;
+            },
             _ => print!("8 None")
+        }
+    }
+
+    fn op_9xxx(&mut self) {
+        if self.v_registers[self.x()] != self.v_registers[self.y()] {
+            self.pc += 4;
+        } else {
+            self.pc += 2;
         }
     }
 
     fn op_axxx(&mut self) {
         self.i_register = self.nnn();
         self.pc += 2;
-        print!("A");
+    }
+
+    fn op_bxxx(&mut self) {
+        self.pc = self.nnn() + self.v_registers[0] as usize;
     }
 
     fn op_cxxx(&mut self) {
         self.v_registers[self.x()] = rand::random::<u8>() + self.kk();
         self.pc += 2;
-        print!("C");
     }
 
     //Make Display!!!
     fn op_dxxx(&mut self) {
         let from = self.i_register;
         let to = from + self.n();
-        // let x = self.v_registers[self.x()] %64;
-        // let y = self.v_registers[self.y()] %32;
-        // self.v_registers[15] = 0;
-        // for i in 0..self.n(){
-        //     let mut b = self.i_register + 1;
-        //     for c in 0..8{
-                //let mut spritePixel = b & (0x80 >> c);
-                //let mut screenPixel = cpu.b[(y + i as u8) as usize *64 + (x+c) as usize];
-                //println!("{}", spritePixel);
-                //println!("{}", screenPixel);
-                // if spritePixel{
-                //     if *screenPixel == 0xFFFFFFFF{
-                //         self.v_registers[15] = 1
-                //     }
-                // }
-            //}
         let x = self.v_registers[self.x()];
         let y = self.v_registers[self.y()];
         self.v_registers[15] = self.display.draw(x as usize, y as usize, &self.memory[from..to]);
         self.pc += 2;
-        //}
+    }
 
-        print!("D");
+    fn op_exxx(&mut self) {
+        match self.opcode & 0x00FF {
+            0x9E => {
+                self.pc += 2;
+            },
+            0xA1 => {
+                self.pc += 4;
+            },
+            _ => print!("E None"), 
+        }
     }
 
     fn op_fxxx(&mut self) {
@@ -213,7 +245,6 @@ impl Cpu {
             _ => self.opcode +=1,
         }
         self.pc += 2;
-        print!("F");
     }
 
     fn nnn(&mut self) -> usize{

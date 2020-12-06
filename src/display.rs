@@ -73,6 +73,7 @@ impl Display {
             }
         }
         self.window.update_with_buffer(&buffer, WIDTH,HEIGHT).unwrap();
+        //self.window.limit_update_rate(Some(std::time::Duration::from_micros(500)));
     }
 }
 
